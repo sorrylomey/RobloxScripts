@@ -1,3 +1,7 @@
+--==================================================
+-- ZZZCheat | tg: @wzeqq
+--==================================================
+
 local Rayfield = loadstring(game:HttpGet(
     "https://github.com/UnknownDeveloper-sqd/UnknownSquad-RayField-Lib/raw/refs/heads/main/Rayfield/CustomRayfield.luau"
 ))()
@@ -8,6 +12,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 local VirtualUser = game:GetService("VirtualUser")
+local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -16,7 +21,10 @@ Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
     Camera = Workspace.CurrentCamera
 end)
 
+--==================================================
 -- SETTINGS
+--==================================================
+
 local Settings = {
     PlayerESP = false,
     PlayerName = true,
@@ -25,10 +33,16 @@ local Settings = {
     PlayerItem = true,
     PlayerTextSize = 14,
 
-    NPCESP = false,
-    NPCName = true,
-    GuardTextSize = 14,
-    NPCAim = false,
+    BotESP = false,
+    BotName = true,
+    BotTextSize = 14,
+
+    AimTargets = {
+        Player = true,
+        NPC = false
+    },
+
+    AimDistance = 3000,
 
     SmoothAim = false,
     VisibilityCheck = true,
@@ -46,7 +60,14 @@ local Settings = {
     OreESP = false
 }
 
+local CachedTarget = nil
+local RightMouseDown = false
+local LastAimUpdate = 0
+
+--==================================================
 -- ESP COLORS
+--==================================================
+
 local ESPColors = {
     PlayerOutline = Color3.fromRGB(255, 255, 255),
     PlayerName = Color3.fromRGB(255, 255, 255),
@@ -54,8 +75,8 @@ local ESPColors = {
     PlayerDistance = Color3.fromRGB(100, 200, 255),
     PlayerItem = Color3.fromRGB(255, 220, 100),
 
-    GuardOutline = Color3.fromRGB(255, 140, 50),
-    GuardName = Color3.fromRGB(255, 140, 50),
+    BotOutline = Color3.fromRGB(255, 140, 50),
+    BotName = Color3.fromRGB(255, 140, 50),
 
     ChestMilitary = Color3.fromRGB(255, 80, 80),
     ChestWood = Color3.fromRGB(100, 255, 120),
@@ -82,11 +103,14 @@ local function richText(value, color)
         .. "</font>"
 end
 
+--==================================================
 -- GUI
+--==================================================
+
 local Window = Rayfield:CreateWindow({
-    Name = "FustSurv | SomeCheats",
-    LoadingTitle = "FustSurv | SomeCheats",
-    LoadingSubtitle = "By: UnknownSquad",
+    Name = "ZZZCheat",
+    LoadingTitle = "ZZZCheat",
+    LoadingSubtitle = "tg: @wzeqq",
     Theme = "Amethyst",
     Width = 460,
     Height = 360,
@@ -94,8 +118,8 @@ local Window = Rayfield:CreateWindow({
 
     ConfigurationSaving = {
         Enabled = true,
-        Folder = "SomeCheats",
-        FileName = "FustSurv"
+        Folder = "ZZZCheat",
+        FileName = "ZZZCheat"
     },
 
     KeySystem = false
@@ -106,7 +130,112 @@ local PveTab = Window:CreateTab("PVE")
 local VisualsTab = Window:CreateTab("Visuals")
 local ColorTab = Window:CreateTab("Colors")
 
+--==================================================
+-- GUI PARENT
+--==================================================
+
+local GuiParent
+
+pcall(function()
+    if gethui then
+        GuiParent = gethui()
+    end
+end)
+
+if not GuiParent then
+    GuiParent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local ESPFolder = Instance.new("Folder")
+ESPFolder.Name = "ZZZCheatESP"
+ESPFolder.Parent = GuiParent
+
+local InjectionNotificationGui = nil
+
+--==================================================
+-- ESP CACHE
+--==================================================
+
+local HighlightCache = {}
+local InfoCache = {}
+
+local BotHighlightCache = {}
+local BotInfoCache = {}
+
+local function createHighlight(color)
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ZZZCheatHighlight"
+    highlight.FillTransparency = 1
+    highlight.OutlineTransparency = 0
+    highlight.OutlineColor = color
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = ESPFolder
+
+    return highlight
+end
+
+local function createInfoGui(name, offset)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = name
+    billboard.Size = UDim2.fromOffset(160, 48)
+    billboard.StudsOffset = Vector3.new(0, offset, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Enabled = false
+    billboard.Parent = ESPFolder
+
+    local label = Instance.new("TextLabel")
+    label.Name = "Info"
+    label.Size = UDim2.fromScale(1, 1)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextStrokeTransparency = 0
+    label.TextSize = 10
+    label.Font = Enum.Font.Code
+    label.TextWrapped = true
+    label.RichText = true
+    label.Parent = billboard
+
+    return billboard
+end
+
+local function removeESP(player)
+    if HighlightCache[player] then
+        HighlightCache[player]:Destroy()
+        HighlightCache[player] = nil
+    end
+
+    if InfoCache[player] then
+        InfoCache[player]:Destroy()
+        InfoCache[player] = nil
+    end
+end
+
+local function removeBotESP(model)
+    if BotHighlightCache[model] then
+        BotHighlightCache[model]:Destroy()
+        BotHighlightCache[model] = nil
+    end
+
+    if BotInfoCache[model] then
+        BotInfoCache[model]:Destroy()
+        BotInfoCache[model] = nil
+    end
+end
+
+local function clearBotESP()
+    for model in pairs(BotHighlightCache) do
+        removeBotESP(model)
+    end
+
+    for model in pairs(BotInfoCache) do
+        removeBotESP(model)
+    end
+end
+
+--==================================================
 -- COLORS TAB
+--==================================================
+
 local function addColorPicker(name, color, flag, callback)
     local success, err = pcall(function()
         ColorTab:CreateColorPicker({
@@ -123,7 +252,7 @@ local function addColorPicker(name, color, flag, callback)
     end)
 
     if not success then
-        warn("Color Picker Error:", name, err)
+        warn("ZZZCheat Color Picker Error:", name, err)
     end
 end
 
@@ -175,23 +304,23 @@ addColorPicker(
 )
 
 ColorTab:CreateDivider()
-ColorTab:CreateSection("Guard ESP")
+ColorTab:CreateSection("Bot ESP")
 
 addColorPicker(
-    "Guard Name",
-    ESPColors.GuardName,
-    "GuardNameColor",
+    "Bot Name",
+    ESPColors.BotName,
+    "BotNameColor",
     function(color)
-        ESPColors.GuardName = color
+        ESPColors.BotName = color
     end
 )
 
 addColorPicker(
-    "Guard Outline",
-    ESPColors.GuardOutline,
-    "GuardOutlineColor",
+    "Bot Outline",
+    ESPColors.BotOutline,
+    "BotOutlineColor",
     function(color)
-        ESPColors.GuardOutline = color
+        ESPColors.BotOutline = color
     end
 )
 
@@ -225,13 +354,13 @@ addColorPicker(
     end
 )
 
+--==================================================
 -- NPC SCANNER
+--==================================================
+
 local NPCList = {}
 local NPCScanEnabled = false
 local NPCConnection
-
-local NPCHighlightCache = {}
-local NPCInfoCache = {}
 
 local function isPlayerCharacter(model)
     for _, player in ipairs(Players:GetPlayers()) do
@@ -243,12 +372,28 @@ local function isPlayerCharacter(model)
     return false
 end
 
+local function getBotType(model)
+    if not model or not model:IsA("Model") then
+        return nil
+    end
+
+    if model.Name == "Guard" then
+        return "Guard"
+    end
+
+    if model.Name == "Soldier" then
+        return "Soldier"
+    end
+
+    return nil
+end
+
 local function registerNPC(model)
     if not model or not model:IsA("Model") then
         return
     end
 
-    if model.Name ~= "Guard" then
+    if not getBotType(model) then
         return
     end
 
@@ -269,6 +414,23 @@ local function startNPCScan()
     end
 
     NPCScanEnabled = true
+
+    NPCConnection = Workspace.DescendantAdded:Connect(function(obj)
+        if not NPCScanEnabled then
+            return
+        end
+
+        if obj:IsA("Humanoid") then
+            local model = obj.Parent
+
+            if model and model:IsA("Model") then
+                task.defer(registerNPC, model)
+            end
+
+        elseif obj:IsA("Model") then
+            task.defer(registerNPC, obj)
+        end
+    end)
 
     task.spawn(function()
         local descendants = Workspace:GetDescendants()
@@ -293,24 +455,12 @@ local function startNPCScan()
 
         descendants = nil
     end)
-
-    NPCConnection = Workspace.DescendantAdded:Connect(function(obj)
-        if not NPCScanEnabled then
-            return
-        end
-
-        if obj:IsA("Humanoid") then
-            local model = obj.Parent
-
-            if model and model:IsA("Model") then
-                registerNPC(model)
-            end
-        end
-    end)
 end
 
 local function stopNPCScan()
-    if Settings.NPCESP or Settings.NPCAim then
+    if Settings.BotESP or (
+        Settings.SmoothAim and Settings.AimTargets.NPC
+    ) then
         return
     end
 
@@ -322,32 +472,60 @@ local function stopNPCScan()
     end
 end
 
+local function updateNPCScanState()
+    if Settings.BotESP or (
+        Settings.SmoothAim and Settings.AimTargets.NPC
+    ) then
+        startNPCScan()
+    else
+        stopNPCScan()
+    end
+end
+
+--==================================================
 -- PVP SETTINGS
+--==================================================
+
 PvpTab:CreateToggle({
     Name = "SmoothAim",
     CurrentValue = false,
+
     Callback = function(value)
         Settings.SmoothAim = value
+        CachedTarget = nil
+        updateNPCScanState()
     end
 })
 
-PvpTab:CreateToggle({
-    Name = "Aim NPC",
-    CurrentValue = false,
-    Callback = function(value)
-        Settings.NPCAim = value
+PvpTab:CreateDropdown({
+    Name = "Aim Targets",
+    Options = {"NPC", "Player"},
+    CurrentOption = {"Player"},
+    MultipleOptions = true,
 
-        if value then
-            startNPCScan()
-        else
-            stopNPCScan()
+    Callback = function(value)
+        local selected = {}
+
+        if typeof(value) == "table" then
+            for _, targetName in ipairs(value) do
+                selected[targetName] = true
+            end
+        elseif typeof(value) == "string" then
+            selected[value] = true
         end
+
+        Settings.AimTargets.Player = selected.Player == true
+        Settings.AimTargets.NPC = selected.NPC == true
+
+        CachedTarget = nil
+        updateNPCScanState()
     end
 })
 
 PvpTab:CreateToggle({
     Name = "Visibility Check",
     CurrentValue = true,
+
     Callback = function(value)
         Settings.VisibilityCheck = value
     end
@@ -358,8 +536,10 @@ PvpTab:CreateDropdown({
     Options = {"Head", "Torso", "Legs"},
     CurrentOption = {"Head"},
     MultipleOptions = false,
+
     Callback = function(value)
-        Settings.AimPart = typeof(value) == "table" and value[1] or value
+        Settings.AimPart =
+            typeof(value) == "table" and value[1] or value
     end
 })
 
@@ -368,8 +548,21 @@ PvpTab:CreateSlider({
     Range = {1, 10},
     Increment = 1,
     CurrentValue = 5,
+
     Callback = function(value)
         Settings.Smoothness = value
+    end
+})
+
+PvpTab:CreateSlider({
+    Name = "Aim Distance",
+    Range = {100, 3000},
+    Increment = 50,
+    CurrentValue = 3000,
+
+    Callback = function(value)
+        Settings.AimDistance = value
+        CachedTarget = nil
     end
 })
 
@@ -378,6 +571,7 @@ PvpTab:CreateSlider({
     Range = {10, 500},
     Increment = 5,
     CurrentValue = 150,
+
     Callback = function(value)
         Settings.FOV = value
     end
@@ -386,17 +580,22 @@ PvpTab:CreateSlider({
 PvpTab:CreateToggle({
     Name = "Show FOV",
     CurrentValue = true,
+
     Callback = function(value)
         Settings.ShowFOV = value
     end
 })
 
+--==================================================
 -- VISUALS: PLAYER ESP
+--==================================================
+
 VisualsTab:CreateSection("Player ESP")
 
 VisualsTab:CreateToggle({
     Name = "Player ESP",
     CurrentValue = false,
+
     Callback = function(value)
         Settings.PlayerESP = value
     end
@@ -405,6 +604,7 @@ VisualsTab:CreateToggle({
 VisualsTab:CreateToggle({
     Name = "Player Name",
     CurrentValue = true,
+
     Callback = function(value)
         Settings.PlayerName = value
     end
@@ -413,6 +613,7 @@ VisualsTab:CreateToggle({
 VisualsTab:CreateToggle({
     Name = "Player Health",
     CurrentValue = true,
+
     Callback = function(value)
         Settings.PlayerHealth = value
     end
@@ -421,6 +622,7 @@ VisualsTab:CreateToggle({
 VisualsTab:CreateToggle({
     Name = "Player Distance",
     CurrentValue = true,
+
     Callback = function(value)
         Settings.PlayerDistance = value
     end
@@ -429,6 +631,7 @@ VisualsTab:CreateToggle({
 VisualsTab:CreateToggle({
     Name = "Player Item",
     CurrentValue = true,
+
     Callback = function(value)
         Settings.PlayerItem = value
     end
@@ -439,62 +642,60 @@ VisualsTab:CreateSlider({
     Range = {10, 24},
     Increment = 1,
     CurrentValue = 14,
+
     Callback = function(value)
         Settings.PlayerTextSize = value
     end
 })
 
--- VISUALS: NPC ESP
+--==================================================
+-- VISUALS: BOT ESP
+--==================================================
+
 VisualsTab:CreateDivider()
-VisualsTab:CreateSection("NPC ESP")
+VisualsTab:CreateSection("ESP Bot (Guard, Soldier)")
 
 VisualsTab:CreateToggle({
-    Name = "NPC ESP (Guard)",
+    Name = "ESP Bot (Guard, Soldier)",
     CurrentValue = false,
+
     Callback = function(value)
-        Settings.NPCESP = value
+        Settings.BotESP = value
 
         if value then
             startNPCScan()
         else
-            for model, highlight in pairs(NPCHighlightCache) do
-                if highlight then
-                    highlight:Destroy()
-                end
-                NPCHighlightCache[model] = nil
-            end
-
-            for model, billboard in pairs(NPCInfoCache) do
-                if billboard then
-                    billboard:Destroy()
-                end
-                NPCInfoCache[model] = nil
-            end
-
-            stopNPCScan()
+            clearBotESP()
         end
+
+        updateNPCScanState()
     end
 })
 
 VisualsTab:CreateToggle({
-    Name = "Guard Name",
+    Name = "Bot Name",
     CurrentValue = true,
+
     Callback = function(value)
-        Settings.NPCName = value
+        Settings.BotName = value
     end
 })
 
 VisualsTab:CreateSlider({
-    Name = "Guard Text Size",
+    Name = "Bot Text Size",
     Range = {10, 24},
     Increment = 1,
     CurrentValue = 14,
+
     Callback = function(value)
-        Settings.GuardTextSize = value
+        Settings.BotTextSize = value
     end
 })
 
+--==================================================
 -- FULLBRIGHT
+--==================================================
+
 local OriginalLighting = {
     Brightness = Lighting.Brightness,
     ClockTime = Lighting.ClockTime,
@@ -538,8 +739,17 @@ local function setFullBright(value)
     end
 end
 
+local lastFullBrightUpdate = 0
+
 RunService.Heartbeat:Connect(function()
-    if Settings.FullBright then
+    if not Settings.FullBright then
+        return
+    end
+
+    local now = os.clock()
+
+    if now - lastFullBrightUpdate >= 1 then
+        lastFullBrightUpdate = now
         pcall(applyFullBright)
     end
 end)
@@ -553,7 +763,10 @@ VisualsTab:CreateToggle({
     Callback = setFullBright
 })
 
+--==================================================
 -- FREECAM
+--==================================================
+
 local FreeCamEnabled = false
 local FreeCamPosition
 local FreeCamYaw = 0
@@ -571,7 +784,10 @@ local CharacterAddedConnection = nil
 
 local function freezeCharacter(character)
     character = character or LocalPlayer.Character
-    if not character then return end
+
+    if not character then
+        return
+    end
 
     local humanoid = character:FindFirstChildOfClass("Humanoid")
         or character:WaitForChild("Humanoid", 10)
@@ -615,7 +831,10 @@ end
 
 local function restoreCharacterFreeze()
     local saved = SavedCharacterState
-    if not saved then return end
+
+    if not saved then
+        return
+    end
 
     local humanoid = saved.Humanoid
     local root = saved.Root
@@ -654,8 +873,11 @@ local function setFreeCam(value)
         FreeCamPosition = Camera.CFrame.Position
 
         local look = Camera.CFrame.LookVector
+
         FreeCamYaw = math.atan2(-look.X, -look.Z)
-        FreeCamPitch = math.asin(math.clamp(look.Y, -1, 1))
+        FreeCamPitch = math.asin(
+            math.clamp(look.Y, -1, 1)
+        )
 
         FreeCamOldType = Camera.CameraType
         FreeCamOldSubject = Camera.CameraSubject
@@ -672,11 +894,12 @@ local function setFreeCam(value)
             CharacterAddedConnection:Disconnect()
         end
 
-        CharacterAddedConnection = LocalPlayer.CharacterAdded:Connect(function(character)
-            if FreeCamEnabled then
-                task.spawn(freezeCharacter, character)
-            end
-        end)
+        CharacterAddedConnection =
+            LocalPlayer.CharacterAdded:Connect(function(character)
+                if FreeCamEnabled then
+                    task.spawn(freezeCharacter, character)
+                end
+            end)
 
     else
         if CharacterAddedConnection then
@@ -686,9 +909,11 @@ local function setFreeCam(value)
 
         restoreCharacterFreeze()
 
-        Camera.CameraType = FreeCamOldType or Enum.CameraType.Custom
+        Camera.CameraType =
+            FreeCamOldType or Enum.CameraType.Custom
 
         local currentCharacter = LocalPlayer.Character
+
         local currentHumanoid = currentCharacter
             and currentCharacter:FindFirstChildOfClass("Humanoid")
 
@@ -718,7 +943,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 
             pcall(function()
                 Rayfield:Notify({
-                    Title = "FreeCam",
+                    Title = "ZZZCheat",
                     Content = "Клавиша назначена: " .. FreeCamKey.Name,
                     Duration = 3
                 })
@@ -738,7 +963,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 end)
 
 RunService:BindToRenderStep(
-    "SomeCheatsFreeCam",
+    "ZZZCheatFreeCam",
     Enum.RenderPriority.Camera.Value + 1,
     function(deltaTime)
         if not FreeCamEnabled then
@@ -751,11 +976,13 @@ RunService:BindToRenderStep(
             return
         end
 
-        UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+        UserInputService.MouseBehavior =
+            Enum.MouseBehavior.LockCenter
 
         local mouseDelta = UserInputService:GetMouseDelta()
 
         FreeCamYaw = FreeCamYaw - mouseDelta.X * 0.003
+
         FreeCamPitch = math.clamp(
             FreeCamPitch - mouseDelta.Y * 0.003,
             math.rad(-85),
@@ -798,7 +1025,8 @@ RunService:BindToRenderStep(
         end
 
         if movement.Magnitude > 0 then
-            FreeCamPosition += rotation:VectorToWorldSpace(movement.Unit)
+            FreeCamPosition +=
+                rotation:VectorToWorldSpace(movement.Unit)
                 * speed * deltaTime
         end
 
@@ -821,6 +1049,7 @@ VisualsTab:CreateSlider({
     Range = {10, 200},
     Increment = 5,
     CurrentValue = 50,
+
     Callback = function(value)
         Settings.FreeCamSpeed = value
     end
@@ -828,12 +1057,13 @@ VisualsTab:CreateSlider({
 
 VisualsTab:CreateButton({
     Name = "Set FreeCam Key",
+
     Callback = function()
         WaitingForFreeCamKey = true
 
         pcall(function()
             Rayfield:Notify({
-                Title = "FreeCam",
+                Title = "ZZZCheat",
                 Content = "Нажми новую клавишу",
                 Duration = 5
             })
@@ -843,12 +1073,14 @@ VisualsTab:CreateButton({
 
 VisualsTab:CreateButton({
     Name = "Reset Camera",
+
     Callback = function()
         if FreeCamEnabled then
             setFreeCam(false)
         end
 
         local character = LocalPlayer.Character
+
         local humanoid = character
             and character:FindFirstChildOfClass("Humanoid")
 
@@ -859,7 +1091,10 @@ VisualsTab:CreateButton({
     end
 })
 
+--==================================================
 -- FOV CIRCLE
+--==================================================
+
 local FOVCircle
 
 pcall(function()
@@ -873,10 +1108,10 @@ pcall(function()
     end
 end)
 
+--==================================================
 -- AIM
-local RightMouseDown = false
-local CachedTarget = nil
-local LastAimUpdate = 0
+--==================================================
+
 local AIM_UPDATE_INTERVAL = 0.05
 
 local RaycastParamsCache = RaycastParams.new()
@@ -945,6 +1180,27 @@ local function checkTarget(character, shortestDistance, center)
         return nil, shortestDistance
     end
 
+    local localCharacter = LocalPlayer.Character
+
+    local localRoot = localCharacter
+        and localCharacter:FindFirstChild("HumanoidRootPart")
+
+    local targetRoot = character:FindFirstChild("HumanoidRootPart")
+        or character.PrimaryPart
+        or targetPart
+
+    if not localRoot or not targetRoot then
+        return nil, shortestDistance
+    end
+
+    local worldDistance = (
+        localRoot.Position - targetRoot.Position
+    ).Magnitude
+
+    if worldDistance > Settings.AimDistance then
+        return nil, shortestDistance
+    end
+
     local screenPosition, onScreen =
         Camera:WorldToViewportPoint(targetPart.Position)
 
@@ -974,6 +1230,7 @@ local function getClosestTarget()
     end
 
     local viewport = Camera.ViewportSize
+
     local center = Vector2.new(
         viewport.X / 2,
         viewport.Y / 2
@@ -982,26 +1239,30 @@ local function getClosestTarget()
     local closestTarget = nil
     local shortestDistance = Settings.FOV
 
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local target, distance = checkTarget(
-                player.Character,
-                shortestDistance,
-                center
-            )
+    -- PLAYER TARGETS
+    if Settings.AimTargets.Player then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local target, distance = checkTarget(
+                    player.Character,
+                    shortestDistance,
+                    center
+                )
 
-            if target then
-                closestTarget = target
-                shortestDistance = distance
+                if target then
+                    closestTarget = target
+                    shortestDistance = distance
+                end
             end
         end
     end
 
-    if Settings.NPCAim then
+    -- NPC TARGETS
+    if Settings.AimTargets.NPC then
         for model in pairs(NPCList) do
             if model
-                and model.Name == "Guard"
                 and model.Parent
+                and getBotType(model)
                 and not isPlayerCharacter(model) then
 
                 local target, distance = checkTarget(
@@ -1040,97 +1301,10 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ESP
-local GuiParent
-
-pcall(function()
-    if gethui then
-        GuiParent = gethui()
-    end
-end)
-
-if not GuiParent then
-    GuiParent = LocalPlayer:WaitForChild("PlayerGui")
-end
-
-local ESPFolder = Instance.new("Folder")
-ESPFolder.Name = "ESPFolder"
-ESPFolder.Parent = GuiParent
-
-local HighlightCache = {}
-local InfoCache = {}
-
-local function createHighlight(color)
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "ESPHighlight"
-    highlight.FillTransparency = 1
-    highlight.OutlineTransparency = 0
-    highlight.OutlineColor = color
-    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    highlight.Parent = ESPFolder
-
-    return highlight
-end
-
-local function createInfoGui(name, offset)
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = name
-    billboard.Size = UDim2.fromOffset(160, 48)
-    billboard.StudsOffset = Vector3.new(0, offset, 0)
-    billboard.AlwaysOnTop = true
-    billboard.Enabled = false
-    billboard.Parent = ESPFolder
-
-    local label = Instance.new("TextLabel")
-    label.Name = "Info"
-    label.Size = UDim2.fromScale(1, 1)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.TextStrokeTransparency = 0
-    label.TextSize = 10
-    label.Font = Enum.Font.Code
-    label.TextWrapped = true
-    label.RichText = true
-    label.Parent = billboard
-
-    return billboard
-end
-
-local function removeESP(player)
-    if HighlightCache[player] then
-        HighlightCache[player]:Destroy()
-        HighlightCache[player] = nil
-    end
-
-    if InfoCache[player] then
-        InfoCache[player]:Destroy()
-        InfoCache[player] = nil
-    end
-end
-
-local function removeNPCESP(model)
-    if NPCHighlightCache[model] then
-        NPCHighlightCache[model]:Destroy()
-        NPCHighlightCache[model] = nil
-    end
-
-    if NPCInfoCache[model] then
-        NPCInfoCache[model]:Destroy()
-        NPCInfoCache[model] = nil
-    end
-end
-
-local function clearNPCESP()
-    for model in pairs(NPCHighlightCache) do
-        removeNPCESP(model)
-    end
-
-    for model in pairs(NPCInfoCache) do
-        removeNPCESP(model)
-    end
-end
-
+--==================================================
 -- ORE ESP
+--==================================================
+
 local OreSettings = {
     Enabled = false,
     Sulfur = true,
@@ -1152,6 +1326,7 @@ local OreDefinitions = {
         label = "Сера",
         color = Color3.fromRGB(255, 220, 0)
     },
+
     {
         key = "Metal",
         names = {
@@ -1161,6 +1336,7 @@ local OreDefinitions = {
         label = "Металл",
         color = Color3.fromRGB(194, 145, 95)
     },
+
     {
         key = "Stone",
         names = {
@@ -1315,6 +1491,7 @@ local function scanOres()
     end
 
     OreScanId += 1
+
     local scanId = OreScanId
 
     task.spawn(function()
@@ -1360,12 +1537,23 @@ Workspace.DescendantRemoving:Connect(function(object)
     end
 end)
 
+local lastOreUpdate = 0
+
 RunService.Heartbeat:Connect(function()
     if not OreSettings.Enabled then
         return
     end
 
+    local now = os.clock()
+
+    if now - lastOreUpdate < 0.25 then
+        return
+    end
+
+    lastOreUpdate = now
+
     local character = LocalPlayer.Character
+
     local root = character
         and character:FindFirstChild("HumanoidRootPart")
 
@@ -1398,7 +1586,10 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+--==================================================
 -- CHEST ESP
+--==================================================
+
 local ChestSettings = {
     Enabled = false,
 
@@ -1611,10 +1802,6 @@ Workspace.DescendantAdded:Connect(function(object)
         return
     end
 
-    if not ChestDefinitions[object.Name] then
-        return
-    end
-
     task.defer(function()
         if ChestSettings.Enabled then
             registerChest(object)
@@ -1644,6 +1831,7 @@ RunService.Heartbeat:Connect(function()
     lastChestUpdate = now
 
     local character = LocalPlayer.Character
+
     local root = character
         and character:FindFirstChild("HumanoidRootPart")
 
@@ -1658,9 +1846,10 @@ RunService.Heartbeat:Connect(function()
 
             removeChestESP(object)
         else
-            local distance = (root.Position - data.Part.Position).Magnitude
-            local visible = distance <= ChestSettings.MaxDistance
+            local distance =
+                (root.Position - data.Part.Position).Magnitude
 
+            local visible = distance <= ChestSettings.MaxDistance
             local chestColor = ESPColors[data.ColorKey]
 
             if data.Highlight then
@@ -1684,12 +1873,16 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+--==================================================
 -- PVE SETTINGS
+--==================================================
+
 PveTab:CreateSection("Ore ESP")
 
 PveTab:CreateToggle({
     Name = "Ore ESP",
     CurrentValue = false,
+
     Callback = function(value)
         OreSettings.Enabled = value
         Settings.OreESP = value
@@ -1700,6 +1893,7 @@ PveTab:CreateToggle({
 PveTab:CreateToggle({
     Name = "Sulfur",
     CurrentValue = true,
+
     Callback = function(value)
         OreSettings.Sulfur = value
         refreshOreESP()
@@ -1709,6 +1903,7 @@ PveTab:CreateToggle({
 PveTab:CreateToggle({
     Name = "Metal",
     CurrentValue = true,
+
     Callback = function(value)
         OreSettings.Metal = value
         refreshOreESP()
@@ -1718,6 +1913,7 @@ PveTab:CreateToggle({
 PveTab:CreateToggle({
     Name = "Stone",
     CurrentValue = true,
+
     Callback = function(value)
         OreSettings.Stone = value
         refreshOreESP()
@@ -1727,6 +1923,7 @@ PveTab:CreateToggle({
 PveTab:CreateToggle({
     Name = "Ore Name",
     CurrentValue = true,
+
     Callback = function(value)
         OreSettings.ShowName = value
     end
@@ -1737,18 +1934,23 @@ PveTab:CreateSlider({
     Range = {25, 1000},
     Increment = 25,
     CurrentValue = 300,
+
     Callback = function(value)
         OreSettings.MaxDistance = value
     end
 })
 
+--==================================================
 -- CHEST ESP UI
+--==================================================
+
 PveTab:CreateDivider()
 PveTab:CreateSection("Chest ESP")
 
 PveTab:CreateToggle({
     Name = "Chest ESP",
     CurrentValue = false,
+
     Callback = function(value)
         ChestSettings.Enabled = value
         Settings.ChestESP = value
@@ -1759,6 +1961,7 @@ PveTab:CreateToggle({
 PveTab:CreateToggle({
     Name = "Деревянный ящик",
     CurrentValue = true,
+
     Callback = function(value)
         ChestSettings.LootCrate = value
         refreshChestESP()
@@ -1768,6 +1971,7 @@ PveTab:CreateToggle({
 PveTab:CreateToggle({
     Name = "Военный ящик",
     CurrentValue = true,
+
     Callback = function(value)
         ChestSettings.MilitaryCrate = value
         refreshChestESP()
@@ -1777,6 +1981,7 @@ PveTab:CreateToggle({
 PveTab:CreateToggle({
     Name = "Элитный ящик",
     CurrentValue = true,
+
     Callback = function(value)
         ChestSettings.EliteCrate = value
         refreshChestESP()
@@ -1786,6 +1991,7 @@ PveTab:CreateToggle({
 PveTab:CreateToggle({
     Name = "Chest Name",
     CurrentValue = true,
+
     Callback = function(value)
         ChestSettings.ShowName = value
 
@@ -1802,6 +2008,7 @@ PveTab:CreateSlider({
     Range = {10, 24},
     Increment = 1,
     CurrentValue = 14,
+
     Callback = function(value)
         ChestSettings.TextSize = value
 
@@ -1822,10 +2029,15 @@ PveTab:CreateSlider({
     Range = {50, 2000},
     Increment = 50,
     CurrentValue = 1000,
+
     Callback = function(value)
         ChestSettings.MaxDistance = value
     end
 })
+
+--==================================================
+-- ANTI-AFK
+--==================================================
 
 PveTab:CreateDivider()
 PveTab:CreateSection("Anti-AFK")
@@ -1833,6 +2045,7 @@ PveTab:CreateSection("Anti-AFK")
 PveTab:CreateToggle({
     Name = "Anti-AFK",
     CurrentValue = false,
+
     Callback = function(value)
         Settings.AntiAFK = value
     end
@@ -1849,7 +2062,10 @@ LocalPlayer.Idled:Connect(function()
     end)
 end)
 
--- PLAYER ESP
+--==================================================
+-- PLAYER ESP UPDATE
+--==================================================
+
 local function updatePlayerESP()
     for _, player in ipairs(Players:GetPlayers()) do
         if player == LocalPlayer then
@@ -1857,12 +2073,15 @@ local function updatePlayerESP()
         end
 
         local character = player.Character
+
         local humanoid = character
             and character:FindFirstChildOfClass("Humanoid")
 
         local root = character
-            and (character:FindFirstChild("HumanoidRootPart")
-            or character:FindFirstChild("Head"))
+            and (
+                character:FindFirstChild("HumanoidRootPart")
+                or character:FindFirstChild("Head")
+            )
 
         if not Settings.PlayerESP then
             if HighlightCache[player] then
@@ -1936,6 +2155,7 @@ local function updatePlayerESP()
 
         if Settings.PlayerDistance then
             local localCharacter = LocalPlayer.Character
+
             local localRoot = localCharacter
                 and localCharacter:FindFirstChild("HumanoidRootPart")
 
@@ -1979,81 +2199,96 @@ local function updatePlayerESP()
     end
 end
 
--- NPC ESP
-local function updateNPCESP()
-    if not Settings.NPCESP then
-        clearNPCESP()
+--==================================================
+-- BOT ESP UPDATE
+--==================================================
+
+local function updateBotESP()
+    if not Settings.BotESP then
+        clearBotESP()
         return
     end
 
     for model in pairs(NPCList) do
         if not model or not model.Parent then
-            removeNPCESP(model)
+            removeBotESP(model)
             NPCList[model] = nil
             continue
         end
 
-        if model.Name ~= "Guard" then
-            removeNPCESP(model)
+        local botType = getBotType(model)
+
+        if not botType then
+            removeBotESP(model)
             NPCList[model] = nil
             continue
         end
 
         local humanoid = model:FindFirstChildOfClass("Humanoid")
+
         local root = model:FindFirstChild("HumanoidRootPart")
             or model:FindFirstChild("Head")
 
         if not humanoid or humanoid.Health <= 0 or not root then
-            removeNPCESP(model)
+            removeBotESP(model)
             continue
         end
 
-        local highlight = NPCHighlightCache[model]
+        local highlight = BotHighlightCache[model]
 
         if not highlight then
-            highlight = createHighlight(ESPColors.GuardOutline)
-            NPCHighlightCache[model] = highlight
+            highlight = createHighlight(ESPColors.BotOutline)
+            BotHighlightCache[model] = highlight
         end
 
         highlight.Adornee = model
-        highlight.OutlineColor = ESPColors.GuardOutline
+        highlight.OutlineColor = ESPColors.BotOutline
         highlight.Enabled = true
 
-        local billboard = NPCInfoCache[model]
+        local billboard = BotInfoCache[model]
 
         if not billboard then
-            billboard = createInfoGui("NPCInfo", 2.5)
-            NPCInfoCache[model] = billboard
+            billboard = createInfoGui("BotInfo", 2.5)
+            BotInfoCache[model] = billboard
         end
 
         local head = model:FindFirstChild("Head")
+
         billboard.Adornee = head or root
 
         local label = billboard:FindFirstChild("Info")
 
         if label then
             label.RichText = true
-            label.Text = Settings.NPCName
-                and richText("Guard", ESPColors.GuardName)
+
+            label.Text = Settings.BotName
+                and richText(botType, ESPColors.BotName)
                 or ""
 
-            label.TextSize = Settings.GuardTextSize
+            label.TextSize = Settings.BotTextSize
         end
 
-        billboard.Enabled = Settings.NPCName
+        billboard.Enabled = Settings.BotName
     end
 end
+
+--==================================================
+-- CLEANUP
+--==================================================
 
 Players.PlayerRemoving:Connect(removeESP)
 
 Workspace.DescendantRemoving:Connect(function(obj)
     if obj:IsA("Model") and NPCList[obj] then
-        removeNPCESP(obj)
+        removeBotESP(obj)
         NPCList[obj] = nil
     end
 end)
 
+--==================================================
 -- MAIN LOOP
+--==================================================
+
 local ESP_UPDATE_INTERVAL = 0.35
 local lastESPUpdate = 0
 
@@ -2062,6 +2297,7 @@ RunService.RenderStepped:Connect(function()
         return
     end
 
+    -- FOV CIRCLE
     if FOVCircle then
         local viewport = Camera.ViewportSize
 
@@ -2071,11 +2307,16 @@ RunService.RenderStepped:Connect(function()
         )
 
         FOVCircle.Radius = Settings.FOV
-        FOVCircle.Visible = Settings.ShowFOV
-            and Settings.SmoothAim
+
+        FOVCircle.Visible =
+            Settings.ShowFOV and Settings.SmoothAim
     end
 
-    if Settings.SmoothAim and RightMouseDown and not FreeCamEnabled then
+    -- SMOOTH AIM
+    if Settings.SmoothAim
+        and RightMouseDown
+        and not FreeCamEnabled then
+
         local now = os.clock()
 
         if now - LastAimUpdate >= AIM_UPDATE_INTERVAL then
@@ -2086,7 +2327,9 @@ RunService.RenderStepped:Connect(function()
         local target = CachedTarget
 
         if target and target.Parent then
-            local smoothness = math.clamp(Settings.Smoothness, 1, 10)
+            local smoothness =
+                math.clamp(Settings.Smoothness, 1, 10)
+
             local alpha = 1 / smoothness
 
             local targetCFrame = CFrame.lookAt(
@@ -2105,24 +2348,32 @@ RunService.RenderStepped:Connect(function()
         CachedTarget = nil
     end
 
+    -- ESP UPDATE
     local now = os.clock()
 
     if now - lastESPUpdate >= ESP_UPDATE_INTERVAL then
         lastESPUpdate = now
 
         updatePlayerESP()
-        updateNPCESP()
+        updateBotESP()
     end
 end)
 
+--==================================================
 -- MOBILE UI
+--==================================================
+
+local toggleGui
+
 if UserInputService.TouchEnabled then
-    local toggleGui = Instance.new("ScreenGui")
-    toggleGui.Name = "MobileToggleGui"
+    toggleGui = Instance.new("ScreenGui")
+
+    toggleGui.Name = "ZZZCheatMobileToggle"
     toggleGui.ResetOnSpawn = false
     toggleGui.Parent = GuiParent
 
     local toggleBtn = Instance.new("TextButton")
+
     toggleBtn.Name = "ToggleUI"
     toggleBtn.Size = UDim2.fromOffset(45, 45)
     toggleBtn.Position = UDim2.new(0.02, 0, 0.25, 0)
@@ -2144,9 +2395,129 @@ if UserInputService.TouchEnabled then
 
     toggleBtn.Activated:Connect(function()
         for _, gui in ipairs(GuiParent:GetChildren()) do
-            if gui:IsA("ScreenGui") and gui ~= toggleGui then
+            if gui:IsA("ScreenGui")
+                and gui ~= toggleGui
+                and gui ~= InjectionNotificationGui then
+
                 gui.Enabled = not gui.Enabled
             end
         end
     end)
 end
+
+--==================================================
+-- INJECTION NOTIFICATION
+--==================================================
+
+local function showInjectionNotification()
+    if InjectionNotificationGui then
+        InjectionNotificationGui:Destroy()
+    end
+
+    local notificationGui = Instance.new("ScreenGui")
+
+    InjectionNotificationGui = notificationGui
+    notificationGui.Name = "ZZZCheatNotification"
+    notificationGui.ResetOnSpawn = false
+    notificationGui.IgnoreGuiInset = true
+    notificationGui.DisplayOrder = 999999
+    notificationGui.Parent = GuiParent
+
+    local frame = Instance.new("Frame")
+
+    frame.Name = "Notification"
+    frame.Size = UDim2.fromOffset(250, 65)
+    frame.AnchorPoint = Vector2.new(1, 1)
+    frame.Position = UDim2.new(1, 270, 1, -25)
+    frame.BackgroundColor3 = Color3.fromRGB(28, 22, 38)
+    frame.BackgroundTransparency = 0.05
+    frame.BorderSizePixel = 0
+    frame.Parent = notificationGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = frame
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(155, 90, 220)
+    stroke.Thickness = 1.5
+    stroke.Transparency = 0.1
+    stroke.Parent = frame
+
+    local title = Instance.new("TextLabel")
+
+    title.Name = "Title"
+    title.BackgroundTransparency = 1
+    title.Position = UDim2.fromOffset(12, 7)
+    title.Size = UDim2.new(1, -24, 0, 22)
+    title.Font = Enum.Font.GothamBold
+    title.Text = "ZZZCheat"
+    title.TextColor3 = Color3.fromRGB(200, 150, 255)
+    title.TextSize = 16
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = frame
+
+    local message = Instance.new("TextLabel")
+
+    message.Name = "Message"
+    message.BackgroundTransparency = 1
+    message.Position = UDim2.fromOffset(12, 31)
+    message.Size = UDim2.new(1, -24, 0, 22)
+    message.Font = Enum.Font.Gotham
+    message.Text = "Чит успешно заинжекчен!"
+    message.TextColor3 = Color3.fromRGB(235, 235, 235)
+    message.TextSize = 13
+    message.TextXAlignment = Enum.TextXAlignment.Left
+    message.Parent = frame
+
+    local appearTween = TweenService:Create(
+        frame,
+        TweenInfo.new(
+            0.4,
+            Enum.EasingStyle.Quint,
+            Enum.EasingDirection.Out
+        ),
+        {
+            Position = UDim2.new(1, -20, 1, -25)
+        }
+    )
+
+    appearTween:Play()
+
+    task.delay(4, function()
+        if not frame.Parent then
+            return
+        end
+
+        local hideTween = TweenService:Create(
+            frame,
+            TweenInfo.new(
+                0.35,
+                Enum.EasingStyle.Quint,
+                Enum.EasingDirection.In
+            ),
+            {
+                Position = UDim2.new(1, 270, 1, -25),
+                BackgroundTransparency = 1
+            }
+        )
+
+        hideTween:Play()
+        hideTween.Completed:Wait()
+
+        if notificationGui then
+            notificationGui:Destroy()
+        end
+
+        if InjectionNotificationGui == notificationGui then
+            InjectionNotificationGui = nil
+        end
+    end)
+end
+
+showInjectionNotification()
+
+print("================================")
+print("ZZZCheat successfully injected")
+print("Author: tg: @wzeqq")
+print("================================")
