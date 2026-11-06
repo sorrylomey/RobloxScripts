@@ -2014,7 +2014,7 @@ local function updatePlayerESP()
         end
         if Settings.PlayerHealth then
             table.insert(lines, richText(
-                string.format("HP: %d%%", math.floor(humanoid.Health), math.floor(humanoid.MaxHealth)),
+                string.format("HP: %d%%", math.floor(humanoid.Health)),
                 ESPColors.PlayerHealth
             ))
         end
