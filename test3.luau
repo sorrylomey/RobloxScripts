@@ -2027,7 +2027,7 @@ local function updatePlayerESP()
         end
         if Settings.PlayerHealth then
             table.insert(lines, richText(
-                string.format("HP: %d%%", math.floor(humanoid.Health)),
+                string.format("HP: %d / %d", math.floor(humanoid.Health), math.floor(humanoid.MaxHealth)),
                 ESPColors.PlayerHealth
             ))
         end
@@ -2036,7 +2036,7 @@ local function updatePlayerESP()
             local localRoot = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
             if localRoot then
                 local distance = (localRoot.Position - root.Position).Magnitude
-                table.insert(lines, richText(string.format("d: %d m", math.floor(distance)), ESPColors.PlayerDistance))
+                table.insert(lines, richText(string.format("DIST: %d m", math.floor(distance)), ESPColors.PlayerDistance))
             end
         end
         if Settings.PlayerItem then
